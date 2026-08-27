@@ -220,6 +220,24 @@ function wireContextTransform(pi: ExtensionAPI, runtime: AcpRuntime): void {
           logWarn("overflow-selfheal", { sid, event: "armed-emergency", tokenCount, limit: config.modelContextLimit });
         }
       }
+      // Usage floor: pi's estimate is anchored on the last provider-reported
+      // usage (previous response's prompt+output ≈ this request's prompt) —
+      // the provider's ground truth on the window's scale. The local sent-view
+      // estimate under-reports CJK/GBK content (up to 2-4x on k9s/Qwen), which
+      // pushes every nudge/truncate band past the real wall (session dies with
+      // stopReason=length, out≈1, while ACP still reports "idle"). Trust the
+      // provider whenever it says more. Cap at 1.5x the window: beyond that the
+      // number is pi's whole-session-tree chars/4 fallback (no usage anchor —
+      // omp #18), not a provider reading, and must not trigger an emergency.
+      const realTokens = realUsage?.tokens ?? null;
+      if (typeof realTokens === "number" && realTokens > tokenCount && configBase.modelContextLimit > 0) {
+        if (realTokens <= configBase.modelContextLimit * 1.5) {
+          logInfo("overflow-selfheal", { sid, event: "usage-floor", local: tokenCount, realTokens });
+          tokenCount = realTokens;
+        } else {
+          debug.event("usage-floor-capped", { sid, realTokens, cap: configBase.modelContextLimit * 1.5 });
+        }
+      }
       // A compress happened since the previous context round: blocks are
       // created out-of-band by the compress tool, so detect new active
       // blocks on the LOADED state vs. the previous round (comparing a

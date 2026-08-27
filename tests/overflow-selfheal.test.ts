@@ -41,6 +41,17 @@ test("inspectOverflowMessage: OpenAI Responses 'maximum context size of N' phras
   assert.equal(inspectOverflowMessage("maximum context size is 128,000").window, 128000);
 });
 
+test("inspectOverflowMessage: k9s 'maximum context length of N' phrasing", () => {
+  // k9s reports "...maximum context length of 131072" ("of", not "is"). The
+  // old regex only matched "is N", so the learned window stayed unknown and
+  // the emergency recenter never happened on k9s sessions.
+  const info = inspectOverflowMessage(
+    "This model's maximum context length of 131072 tokens was exceeded by the prompt.",
+  );
+  assert.equal(info.isOverflow, true);
+  assert.equal(info.window, 131072);
+});
+
 test("inspectOverflowMessage: overflow without a stated window → window undefined", () => {
   const info = inspectOverflowMessage("prompt is too long, please shorten the conversation");
   assert.equal(info.isOverflow, true);

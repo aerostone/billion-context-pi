@@ -93,3 +93,22 @@ test("context transform DOES go emergency when the sent view itself overflows", 
   assert.ok(nudgeCount(r) >= 1, "emergency nudge fires on real sent-view overflow");
   await rm(`${STATE_FILE}.1000.acp.json`, { force: true });
 });
+
+test("usage floor trusts a provider reading the local estimate under-reports (k9s RC1)", async () => {
+  await rm(`${STATE_FILE}.150000.acp.json`, { force: true });
+  const { api, handlers } = captureApi();
+  createAcpExtension({ modelContextLimit: 180_000 })(api as any);
+
+  // The k9s/Qwen pattern: CJK/GBK content makes the local sent-view estimate
+  // (~36K here) far below the provider's own count (150K — 83% of the 180K
+  // window, under the 1.5x tree-fallback cap). Without the floor, the nudge
+  // bands stay "idle" until the request dies at the real wall.
+  const ctx = fakeCtx(150_000);
+  const entries = [msg("e0", "user", "start " + MID)];
+  for (let i = 1; i <= 7; i++) entries.push(msg(`e${i}`, i % 2 ? "assistant" : "user", `f${i} ` + MID));
+
+  branchEntries = entries;
+  const r = await fire(handlers, entries, ctx);
+  assert.ok(nudgeCount(r) >= 1, "provider-anchored usage floors tokenCount past the 75% band");
+  await rm(`${STATE_FILE}.150000.acp.json`, { force: true });
+});

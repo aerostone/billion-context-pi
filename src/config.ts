@@ -29,8 +29,10 @@ export interface CompressSettings {
    *  Default: 0.95. Must be >= maxContextLimit. Maps to kernel
    *  nudge.emergencyThresholdPct + truncate.threshold. */
   emergencyThresholdPercent?: number | string;
-  /** Token growth threshold for soft compression nudges. Default: 50000.
-   *  Maps to kernel nudge.growthFloor + nudge.growthCap. */
+  /** Token growth threshold for soft compression nudges. Default:
+   *  window-scaled — min(50000, max(20000, 25% of the context limit)), see
+   *  defaultNudgeGrowthTokens. Maps to kernel nudge.growthFloor +
+   *  nudge.growthCap. */
   nudgeGrowthTokens?: number;
 }
 
@@ -195,8 +197,25 @@ export function resolveConfig(adapter: AdapterConfig, liveContextLimit: number, 
   if (c.nudgeGrowthTokens !== undefined) {
     config.nudge.growthFloor = c.nudgeGrowthTokens;
     config.nudge.growthCap = c.nudgeGrowthTokens;
+  } else {
+    const defaultGrowth = defaultNudgeGrowthTokens(limit);
+    config.nudge.growthFloor = defaultGrowth;
+    config.nudge.growthCap = defaultGrowth;
   }
   return config;
+}
+
+/**
+ * Window-scaled default for the soft-nudge growth threshold. The kernel
+ * default (50k) is sized for a 128k+ window; on a smaller window (e.g. 96k
+ * with a 16k output reservation → ~80k effective limit) 50k means the soft
+ * path only fires when a large share of the remaining budget is already
+ * spent, and fragmented sessions never accumulate 50k in one range before
+ * the hard bands. Scale with the window, clamped to [20k, 50k].
+ */
+export function defaultNudgeGrowthTokens(limit: number): number {
+  if (!Number.isFinite(limit) || limit <= 0) return 50_000;
+  return Math.min(50_000, Math.max(20_000, Math.round(limit * 0.25)));
 }
 
 export function parsePercent(v: number | string): number {

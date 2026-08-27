@@ -26,6 +26,13 @@ You have four context-management tools:
 - search_context — Search compressed block summaries (and optionally visible messages) by keyword. Use BEFORE decompressing to find the right block. Example: search_context({ query: "auth token refresh" }).
 - acp_status — Context status with compressible ranges. No args = overview + totals. scope:"uncompressed" for range view; add view:"messages" for per-message listing. scope:"compressed" for block details.
 
+ OUTPUT LIMIT SAFETY
+
+ A single response has a hard output-token budget. A tool call whose arguments exceed it is DROPPED — the tool never runs and you only see a truncated-response error, which wastes the whole turn. So:
+ - When writing a file whose content will be large (roughly more than 8K tokens), do NOT emit it in one tool call. Write the first chunk with write, then append the rest with separate edit calls (each chunk comfortably under the budget).
+ - Keep long command outputs out of single responses: prefer several focused commands over one that dumps everything.
+ - If a tool call reports it was not executed because the response hit the output token limit, split that operation into smaller calls — do not retry the same large call.
+
 ${prompts.compressPhilosophy}
 
 WHEN TO COMPRESS

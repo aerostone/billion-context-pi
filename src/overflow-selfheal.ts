@@ -53,8 +53,10 @@ function parseOverflowWindow(text: string): number | undefined {
   // Anthropic: "prompt is too long: 130000 tokens > 128000 maximum" -> 128000
   let m = />\s*(\d[\d,]*)\s*(?:tokens?)?\s*maximum/i.exec(text);
   if (m) return toTokenNumber(m[1]);
-  // OpenAI: "maximum context length is 128000 tokens"
-  m = /maximum context length is (\d[\d,]*)/i.exec(text);
+  // OpenAI: "maximum context length is 128000 tokens"; some relays (k9s):
+  // "maximum context length of 131072" — the "of" variant used to leave the
+  // learned window unknown, so the recenter never happened.
+  m = /maximum context length (?:is|of) (\d[\d,]*)/i.exec(text);
   if (m) return toTokenNumber(m[1]);
   // OpenAI Responses (newer phrasing): "exceeds the model's maximum context
   // size of 128000 tokens" — must be parsed too, or the learned window stays

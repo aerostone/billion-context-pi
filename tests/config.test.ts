@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveConfig, resolveCompress, mergeCompress, resolveDelegate, type AdapterConfig } from "../src/config.js";
+import { resolveConfig, resolveCompress, mergeCompress, resolveDelegate, defaultNudgeGrowthTokens, type AdapterConfig } from "../src/config.js";
 
 const EMPTY: AdapterConfig = {};
 
@@ -80,6 +80,30 @@ test("resolveConfig leaves growthFloor/growthCap at kernel defaults when compres
   const cfg = resolveConfig(EMPTY, 1_000_000);
   assert.equal(cfg.nudge.growthFloor, 50000);
   assert.equal(cfg.nudge.growthCap, 50000);
+});
+
+test("resolveConfig scales the default growth threshold with small windows", () => {
+  // 96k window (the k9s/Qwen case): 25% = 24064, well below the 50k that
+  // let fragmented sessions run past the hard bands.
+  const small = resolveConfig(EMPTY, 96_256);
+  assert.equal(small.nudge.growthFloor, 24064);
+  assert.equal(small.nudge.growthCap, 24064);
+  // Below 80k the 20k floor wins over 25%.
+  const tiny = resolveConfig(EMPTY, 32_000);
+  assert.equal(tiny.nudge.growthFloor, 20000);
+  assert.equal(tiny.nudge.growthCap, 20000);
+  // Mid-size window: 25% in the clamp band.
+  const mid = resolveConfig(EMPTY, 150_000);
+  assert.equal(mid.nudge.growthFloor, 37500);
+  assert.equal(mid.nudge.growthCap, 37500);
+});
+
+test("defaultNudgeGrowthTokens clamps and degrades on missing limit", () => {
+  assert.equal(defaultNudgeGrowthTokens(0), 50000);
+  assert.equal(defaultNudgeGrowthTokens(-1), 50000);
+  assert.equal(defaultNudgeGrowthTokens(NaN), 50000);
+  assert.equal(defaultNudgeGrowthTokens(128_000), 32000);
+  assert.equal(defaultNudgeGrowthTokens(1_000_000), 50000);
 });
 
 test("resolveConfig handles all three compress fields together", () => {
