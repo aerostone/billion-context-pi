@@ -16,6 +16,10 @@ export function collectCoveredMessageIds(state: { blocks: { active: boolean; eff
 // ~Anthropic screenshot cost; real per-model cost (85..2.8K) converges via density calibration.
 export const IMAGE_TOKEN_COST = 1600;
 
+// Ref tag overhead per message that gets a tag (user + tool messages, NOT assistant).
+// Tag format: <acp tokens="XXX" type="text">mNNNNN</acp> (~45-50 chars ≈ 12 tokens).
+export const REF_TAG_TOKEN_OVERHEAD = 12;
+
 // pi-ai silently drops image blocks for non-vision models, so they cost nothing there.
 export function modelSupportsImages(model: unknown): boolean {
   const input = (model as { input?: string[] } | null | undefined)?.input;
@@ -40,6 +44,8 @@ export function estimateTokens(messages: CoreMessage[], coveredIds?: Set<string>
     if (m.toolName === "compress") continue;
     if (coveredIds?.has(m.id)) continue;
     tokens += defaultCountTokens(m.text ?? "");
+    // Add ref tag overhead for messages that will get tags injected (user + tool, NOT assistant).
+    if (m.role === "user" || m.role === "tool") tokens += REF_TAG_TOKEN_OVERHEAD;
     const img = imageTokensById?.get(m.id);
     if (img) tokens += img;
   }

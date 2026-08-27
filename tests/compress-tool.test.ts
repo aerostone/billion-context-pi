@@ -76,7 +76,8 @@ test("compress beforeTokens at density=1 is uncalibrated estimateTokens", async 
     undefined, undefined, ctx,
   );
   const text = typeof out === "string" ? out : out.content?.[0]?.text ?? String(out);
-  assert.equal(beforeTokensFrom(text), 324); // 3 + 300 (ZH) + <acp> tag chars (~21)
+  // systemPromptTokens (~21) + 3 (hello world) + 300 (ZH) + 2 * REF_TAG_TOKEN_OVERHEAD (12) = 348
+  assert.equal(beforeTokensFrom(text), 348);
 });
 
 test("compress beforeTokens scales with calibrated density (Phase 2)", async () => {

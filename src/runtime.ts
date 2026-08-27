@@ -6,6 +6,7 @@ import {
   type CompressionCore,
   type CompressionState,
   type Config,
+  createInitialState,
   type Prompts,
 } from "acp-kernel";
 import { resolveConfig, type AdapterConfig } from "./config.js";
@@ -365,7 +366,9 @@ export function createRuntime(adapter: AdapterConfig): AcpRuntime {
     const sm = ctx.sessionManager;
     const sessionFile = sm.getSessionFile() ?? undefined;
     const sessionId = sm.getSessionId();
-    const state = await store.load(sessionFile, sessionId);
+    // When persistState is false, skip loading from disk and start fresh.
+    const persist = adapterRef.persistState ?? true;
+    const state = persist ? await store.load(sessionFile, sessionId) : createInitialState();
     const entries = readContextEntries(sm);
     // omp fires the context event BEFORE the current user message is persisted
     // to the session branch (its agent-loop emits message_end only after
@@ -389,6 +392,8 @@ export function createRuntime(adapter: AdapterConfig): AcpRuntime {
 
   async function save(state: CompressionState, ctx: ExtensionContext) {
     const sm = ctx.sessionManager;
+    // When persistState is false, skip writing to disk.
+    if (!(adapterRef.persistState ?? true)) return;
     await store.save(state, sm.getSessionFile() ?? undefined, sm.getSessionId());
   }
 

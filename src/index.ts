@@ -190,7 +190,15 @@ function wireContextTransform(pi: ExtensionAPI, runtime: AcpRuntime): void {
       const realUsage = ctx.getContextUsage?.();
       const systemPromptText = getSystemPromptText(ctx);
       const systemPromptTokens = systemPromptText ? defaultCountTokens(systemPromptText) : 0;
-      const sentTokens = estimateTokens(coreMessages, coveredIds, collectImageTokens(entries, modelSupportsImages(ctx.model))) + systemPromptTokens;
+      // Active block summaries are injected by the kernel as synthetic system
+      // messages (acp_summary_*). They consume real context tokens but are NOT
+      // present in coreMessages (session entries). Count them here so the sent
+      // view estimate matches what the LLM actually sees, and so density
+      // calibration (realUsage vs sentTokens) stays on a consistent basis.
+      const activeSummaryTokens = state.blocks
+        .filter((b) => b.active)
+        .reduce((sum, b) => sum + defaultCountTokens(b.summary ?? ""), 0);
+      const sentTokens = estimateTokens(coreMessages, coveredIds, collectImageTokens(entries, modelSupportsImages(ctx.model))) + systemPromptTokens + activeSummaryTokens;
       // Usage/emergency arbitration on the CALIBRATED sent view: density is
       // the provider-anchored real/estimate ratio learned by the estimator
       // (docs/token-calibration-plan.md §3.2). Raw CJK-aware estimates

@@ -8,14 +8,16 @@ test("estimateTokens matches kernel defaultCountTokens (CJK 1:1 + chars/4)", () 
   ];
   // defaultCountTokens (acp-kernel 0.0.7+): CJK 1:1 + non-CJK chars/4.
   // 24 non-CJK chars → ceil(24/4) = 6
-  assert.equal(estimateTokens(msgs), 6);
+  // + REF_TAG_TOKEN_OVERHEAD (12) for user message = 18
+  assert.equal(estimateTokens(msgs), 18);
 });
 
 test("estimateTokens is consistent with kernel counter for CJK (each char = 1 token)", () => {
   const zh = "这是一个中文测试";
   const msgs = [{ id: "m1", role: "user", contentType: "text", text: zh }];
   // 8 CJK chars → 8 tokens under defaultCountTokens; chars/4 would give 2
-  assert.equal(estimateTokens(msgs), 8);
+  // + REF_TAG_TOKEN_OVERHEAD (12) for user message = 20
+  assert.equal(estimateTokens(msgs), 20);
 });
 
 test("estimateTokens skips compress tool calls", () => {
@@ -24,8 +26,8 @@ test("estimateTokens skips compress tool calls", () => {
     { id: "m2", role: "assistant", contentType: "tool-call", toolName: "compress", text: "ignored payload here" },
     { id: "m3", role: "user", contentType: "text", text: "delta epsilon" },
   ];
-  // m1 (4) + skip m2 (compress) + m3 (4) = 8
-  assert.equal(estimateTokens(msgs), 8);
+  // m1 (4 + 12) + skip m2 (compress) + m3 (4 + 12) = 32
+  assert.equal(estimateTokens(msgs), 32);
 });
 
 test("estimateTokens skips covered (already-compressed) message ids", () => {
@@ -34,8 +36,8 @@ test("estimateTokens skips covered (already-compressed) message ids", () => {
     { id: "m3", role: "user", contentType: "text", text: "delta epsilon" },
   ];
   const covered = new Set(["m3"]);
-  // m1 (4) + skip m3 (covered) = 4
-  assert.equal(estimateTokens(msgs, covered), 4);
+  // m1 (4 + 12) + skip m3 (covered) = 16
+  assert.equal(estimateTokens(msgs, covered), 16);
 });
 
 test("lastUserMessageId returns the id of the last user-role entry", () => {

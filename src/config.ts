@@ -112,6 +112,10 @@ export interface AdapterConfig {
    *  (lost paths/signatures/decisions → worse retrieval). */
   acknowledgePromptsRisk?: boolean;
   coreOverrides?: Partial<Config>;
+  /** Persist compression state to disk (~/.pi/agent/sessions/*.acp.json) and
+   *  inherit from parent sessions. Default: true. Set to false to disable
+   *  long-term memory (each session starts fresh, no cross-session state). */
+  persistState?: boolean;
 }
 
 export const DEFAULT_TOOL_BASH_TIMEOUT = 60;

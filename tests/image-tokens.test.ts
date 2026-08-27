@@ -101,8 +101,10 @@ test("estimateTokens adds image tokens and skips covered ids", () => {
     { id: "m2", role: "user", contentType: "text", text: "alpha beta gamma" },
   ];
   const imageTokens = new Map([["m1", IMAGE_TOKEN_COST]]);
-  assert.equal(estimateTokens(msgs, undefined, imageTokens), IMAGE_TOKEN_COST + 4);
-  assert.equal(estimateTokens(msgs, new Set(["m1"]), imageTokens), 4);
+  // m1 (0 + 12 overhead + IMAGE_TOKEN_COST) + m2 (4 + 12 overhead) = IMAGE_TOKEN_COST + 28
+  assert.equal(estimateTokens(msgs, undefined, imageTokens), IMAGE_TOKEN_COST + 28);
+  // m1 (covered, skip) + m2 (4 + 12 overhead) = 16
+  assert.equal(estimateTokens(msgs, new Set(["m1"]), imageTokens), 16);
 });
 
 const lastTurnLine = async (logFile: string) => {
@@ -119,8 +121,8 @@ test("sent-view token count includes image tokens (vision model)", async () => {
   const entries = Array.from({ length: 8 }, (_, i) => imgEntry(`e${i}`));
   const ctx = ctxWithModel(entries, 10_000, ["text", "image"]);
   await handlers.get("context")![0]!({ type: "context", messages: entries.map((e) => e.message) }, ctx);
-  // 8 × 1600 = 12800 → 128% of the 10K window, despite empty visible text.
-  assert.match(await lastTurnLine(logFile), /tokens=12800 pct=128 limit=10000/, "image tokens must land in the sent-view estimate");
+  // 8 × 1600 + 8 × REF_TAG_TOKEN_OVERHEAD (12) = 12896 → 129% of the 10K window, despite empty visible text.
+  assert.match(await lastTurnLine(logFile), /tokens=12896 pct=129 limit=10000/, "image tokens must land in the sent-view estimate");
   await rm(logFile, { force: true });
 });
 
